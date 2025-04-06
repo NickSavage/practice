@@ -1,12 +1,14 @@
 from collections import defaultdict
 from typing import List
+import copy
 
 class Position:
-    def __init__(self, row, col, number, state):
+    def __init__(self, row, col, number, state, rejected):
         self.row = row
         self.col = col
         self.number = number
-        self.state = state
+        self.state = copy.deepcopy(state)
+        self.rejected = copy.deepcopy(rejected)
 
 class Board:
     def __init__(self, state):
@@ -135,6 +137,28 @@ def is_solved(board) -> bool:
 
     return True
 
+def check_inconsistency(board) -> bool:
+
+    for row_index in range(ROWS):
+        freq = defaultdict(int)
+        for col_index in range(COLS):
+            item = board.state[row_index][col_index]
+            freq[item] += 1
+        for key, value in freq.items():
+            if key != 0 and value > 1:
+                print(f"inconsistency in row: {row_index}: there are {value} number {key}")
+                return True
+    for col_index in range(COLS):
+        freq = defaultdict(int)
+        for row_index in range(ROWS):
+            item = board.state[row_index][col_index]
+            freq[item] += 1
+        for key, value in freq.items():
+            if key != 0 and value > 1:
+                print(f"inconsistency in col: {col_index}: there are {value} number {key}")
+                return True
+    return False
+
 def forward_pass(board) -> Board:
     find_options(board)
     change = False
@@ -156,9 +180,11 @@ def forward_pass(board) -> Board:
 #                print(f"changed {row} {col}")
                 board.state[row][col] = board.options[row][col][0]
                 board.options[row][col] = []
+                print(f"changed {row} {col}")
+                if check_inconsistency(board):
+                    board.inconsistency = True
+                    return board
                 change = True
-        if change:
-            break
     if not change:
         print("no change made")
         board.no_match = True
@@ -178,11 +204,11 @@ def run_state(board) -> Board:
 
         if board.inconsistency:
             board.inconsistency = False
-            print(board)
             if len(board.guesses) > 0:
                 last_pos = board.guesses.pop()
                 print(f"inconsistency: {last_pos.number} at {last_pos.row},{last_pos.col}")
                 board.state = last_pos.state
+                board.rejected = last_pos.rejected
                 board.rejected[last_pos.row][last_pos.col].append(last_pos.number)
             else:
                 board.no_match = True
@@ -192,12 +218,11 @@ def run_state(board) -> Board:
                 for col in range(COLS):
                     if len(board.options[row][col]) == 0:
                         continue
-                    print(board.options[row][col])
                     for option in board.options[row][col]:
                         if option in board.rejected[row][col]:
                             continue
                         board.no_match = False
-                        pos = Position(row, col, option, board.state)
+                        pos = Position(row, col, option, board.state, board.rejected)
                         board.state[row][col] = option
                         print(f"lets guess at {option} at {row},{col}")
                         board.guesses.append(pos)
@@ -211,6 +236,7 @@ def run_state(board) -> Board:
 
             print("can't find a match")
             break
+    return board
 
 run_state(board)
 
